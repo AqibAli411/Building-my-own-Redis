@@ -4,7 +4,20 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"golang.org/x/sys/unix"
 )
+
+func fb_set_nb(fb int) {
+	flags, err := unix.FcntlInt(uintptr(fb), unix.F_GETFL, 0)
+	if err != nil {
+		panic(err)
+	}
+	flags |= unix.O_NONBLOCK
+	_, err = unix.FcntlInt(uintptr(fb), unix.F_SETFL, flags)
+	if err != nil {
+		panic(err)
+	}
+}
 
 func main() {
 	ln, err := net.Listen("tcp", ":1234")
