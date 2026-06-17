@@ -65,5 +65,7 @@ func DoRequest(cmd []string, out *[]byte) {
 		} else {
 			*out = []byte("1")
 		}
+	case "keys":
+		*out = []byte(fmt.Sprintf("keys count: %d", utils.HmapSize(&Gdata.DB)))
 	}
 }
