@@ -1,13 +1,18 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
+	"math"
+	"strconv"
+	"strings"
 	"unsafe"
+
 	"aqib.builds/utils"
 )
 
 type ServerState struct {
-	DB utils.HMap
+	DB       utils.HMap
 }
 
 var Gdata ServerState
@@ -19,7 +24,7 @@ func NodeEq(a *utils.HNode, b *utils.HNode) bool {
 }
 
 func lookUpOrCreate(key string) *utils.Entry {
-	entry := &utils.Entry{Key: key, Type: utils.T_STR, HeapIndex: -1}
+	entry := &utils.Entry{Key: key, Type: utils.T_ZSET, HeapIndex: -1}
 	entry.Node.Hcode = utils.HashKey(key)
 	from := utils.HmapLookup(&Gdata.DB, &entry.Node, NodeEq)
 	if from != nil {
@@ -44,7 +49,7 @@ func DoRequest(cmd []string, out *[]byte) {
 	if len(cmd) == 0 {
 		return
 	}
-	switch cmd[0] {
+	switch strings.ToLower(cmd[0]) {
 	case "get":
 		entry, _ := lookUpExisting(cmd[1], utils.T_STR)
 		if entry == nil {
@@ -55,6 +60,7 @@ func DoRequest(cmd []string, out *[]byte) {
 	case "set":
 		entry := lookUpOrCreate(cmd[1])
 		entry.Str = cmd[2]
+		entry.Type = utils.T_STR
 		*out = []byte("OK")
 	case "del":
 		entry := &utils.Entry{Key: cmd[1]}
@@ -65,7 +71,25 @@ func DoRequest(cmd []string, out *[]byte) {
 		} else {
 			*out = []byte("1")
 		}
-	case "keys":
-		*out = []byte(fmt.Sprintf("keys count: %d", utils.HmapSize(&Gdata.DB)))
+	case "zadd":
+		entry := lookUpOrCreate(cmd[1])
+		score, _ := strconv.ParseFloat(cmd[2], 64)
+		if entry.ZSet == nil {
+			entry.ZSet = &utils.ZSet{}
+		}
+		utils.ZSetInsert(entry.ZSet, cmd[3], score)
+		*out = []byte("OK")
+	case "zscore":
+		entry, _ := lookUpExisting(cmd[1], utils.T_ZSET)
+		if entry == nil {
+			*out = []byte("nil")
+			return
+		}
+		found := utils.ZSetLookup(entry.ZSet, cmd[2])
+		if found == nil {
+			*out = []byte("nil")
+		} else {
+			*out = []byte(fmt.Sprintf("%f", found.Score))
+		}
 	}
 }
